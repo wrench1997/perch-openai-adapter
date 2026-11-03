@@ -1,0 +1,58 @@
+# 修 DeepSeek Harness 桌面版「当前模型不支持图片」
+#
+# 原因：你的 cordis.patch.yml 里 models 条目只有 id 和 name，没有 inputModalities。
+# Harness 的 catalogModelInfo 会兜底成 ["text"]：
+#     inputModalities: model.inputModalities ?? ["text"]
+# 然后桌面版准入检查直接拒绝：
+#     if (model.inputModalities !== void 0 && !model.inputModalities.includes("image"))
+#         throw `Model "${model}" does not support image input.`
+#
+# 修法：给每个模型条目加上 inputModalities: ["text", "image"]。
+# 四个 tier 都验证过能读图（pro 1m 读出 PRO1M47，standard 也读对了）。
+
+# ============================================================
+# 把下面这一整段，替换掉 cordis.patch.yml 里现有的
+# 「- id: llm-pi-ai」到「apiKeyEnv: PERCH_API_KEY」之间的内容
+# ============================================================
+
+- id: llm-pi-ai
+  name: "@deepseek-ai/dsh-llm-pi-ai"
+  config:
+    providers:
+      opencode-go:
+        apiKeyEnv: OPENCODE_GO_API_KEY
+      perch:
+        displayName: perch
+        api: openai-completions
+        baseURL: http://127.0.0.1:8791/v1
+        models:
+          - id: standard
+            name: Standard
+            contextWindow: 200000
+            inputModalities: ["text", "image"]
+          - id: standard 1m
+            name: Standard 1M
+            contextWindow: 1000000
+            inputModalities: ["text", "image"]
+          - id: pro
+            name: Pro
+            contextWindow: 200000
+            inputModalities: ["text", "image"]
+          - id: pro 1m
+            name: Pro 1M
+            contextWindow: 1000000
+            inputModalities: ["text", "image"]
+        apiKeyEnv: PERCH_API_KEY
+
+# ============================================================
+# 改之前先备份：
+#   Copy-Item "$env:USERPROFILE\.dsh\profiles\desktop\cordis.patch.yml" `
+#             "$env:USERPROFILE\.dsh\profiles\desktop\cordis.patch.yml.bak"
+#
+# 改完重启 DeepSeek Harness（完全退出，不是最小化）。
+#
+# 验证：
+#   1. 打开设置 → 模型，确认 perch provider 下四个模型都在
+#   2. 选 pro 1m，发一张图 + 一句话
+#   3. 应该能正常回复，不再报「当前模型不支持图片」
+# ============================================================
